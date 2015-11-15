@@ -13,11 +13,15 @@
 package org.eclipse.buildship.core.workspace;
 
 import java.util.List;
+import java.util.Map;
+
+import com.google.common.collect.ImmutableMap;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.ClasspathContainerInitializer;
+import org.eclipse.jdt.core.IClasspathAttribute;
 import org.eclipse.jdt.core.IClasspathContainer;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
@@ -39,6 +43,8 @@ public abstract class GradleClasspathContainer implements IClasspathContainer {
      * actual external (source and binary) jars.
      */
     public static final String CONTAINER_ID = "org.eclipse.buildship.core.gradleclasspathcontainer";
+
+    public static final String EXTRA_ATTRIBUTE_SUBSTITIUTION_RULE = "substitution-rule";
 
     /**
      * Creates a new classpath container instance.
@@ -82,6 +88,23 @@ public abstract class GradleClasspathContainer implements IClasspathContainer {
         } catch (CoreException e) {
             throw new GradlePluginsRuntimeException(e);
         }
+    }
+
+    public static IClasspathAttribute substitutionRule(String gavName, String projectId) {
+        return JavaCore.newClasspathAttribute(EXTRA_ATTRIBUTE_SUBSTITIUTION_RULE,  gavName + " -- " + projectId);
+    }
+
+    public static Map<String, String> collectSubstitutionRules(IClasspathAttribute[] attributes) {
+        ImmutableMap.Builder<String, String> rules = ImmutableMap.builder();
+        for (IClasspathAttribute attribute : attributes) {
+            if (attribute.getName().equals(EXTRA_ATTRIBUTE_SUBSTITIUTION_RULE)) {
+                String[] gavNameAndProjectId = attribute.getValue().split(" -- ");
+                if (gavNameAndProjectId.length == 2) {
+                    rules.put(gavNameAndProjectId[0], gavNameAndProjectId[1]);
+                }
+            }
+        }
+        return rules.build();
     }
 
 }

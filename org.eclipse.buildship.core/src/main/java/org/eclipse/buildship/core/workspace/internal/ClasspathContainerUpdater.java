@@ -13,6 +13,7 @@
 package org.eclipse.buildship.core.workspace.internal;
 
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
@@ -27,7 +28,10 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.*;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Updates the classpath container of the target project.
@@ -54,29 +58,43 @@ final class ClasspathContainerUpdater {
     }
 
     private void updateClasspathContainer(IProgressMonitor monitor) throws JavaModelException {
-        ImmutableList<IClasspathEntry> containerEntries = collectClasspathContainerEntries();
+        Map<String, String> substitutionRules = getSubstitutionRules();
+        ImmutableList<IClasspathEntry> containerEntries = collectClasspathContainerEntries(substitutionRules);
         setClasspathContainer(containerEntries, monitor);
     }
 
-    private ImmutableList<IClasspathEntry> collectClasspathContainerEntries() {
+    private ImmutableList<IClasspathEntry> collectClasspathContainerEntries(final Map<String, String> substitutionRules) throws JavaModelException {
         // project dependencies
-        List<IClasspathEntry> projectDependencies = FluentIterable.from(this.gradleProject.getProjectDependencies())
-                .transform(new Function<OmniEclipseProjectDependency, IClasspathEntry>() {
-
-                    @Override
-                    public IClasspathEntry apply(OmniEclipseProjectDependency dependency) {
-                        OmniEclipseProject dependentProject = ClasspathContainerUpdater.this.gradleProject.getRoot()
-                                .tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetProjectPath())).get();
-                        IPath path = new Path("/" + dependentProject.getName());
-                        return JavaCore.newProjectEntry(path, dependency.isExported());
-                    }
-                }).toList();
+        ImmutableList.Builder<IClasspathEntry> projectDependencies = ImmutableList.builder();
+        for (OmniEclipseProjectDependency dependency : this.gradleProject.getProjectDependencies()) {
+            OmniEclipseProject dependentProject = ClasspathContainerUpdater.this.gradleProject.getRoot()
+                    .tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetProjectPath())).get();
+            IPath path = new Path("/" + dependentProject.getName());
+            projectDependencies.add(JavaCore.newProjectEntry(path, dependency.isExported()));
+        }
+        for (OmniExternalDependency dependency : this.gradleProject.getExternalDependencies()) {
+            if (dependency.getGradleModuleVersion().isPresent() && dependency.getGradleModuleVersion().get() != null) {
+                String moduleName = dependency.getGradleModuleVersion().get().getName();
+                if (substitutionRules.get(moduleName) != null) {
+                    IPath path = new Path("/" + moduleName);
+                    projectDependencies.add(JavaCore.newProjectEntry(path, dependency.isExported()));
+                }
+            }
+        }
 
         // external dependencies
         List<IClasspathEntry> externalDependencies = FluentIterable.from(this.gradleProject.getExternalDependencies()).filter(new Predicate<OmniExternalDependency>() {
 
             @Override
             public boolean apply(OmniExternalDependency dependency) {
+                // exclude substituted binary dependencies
+                if (dependency.getGradleModuleVersion().isPresent() && dependency.getGradleModuleVersion().get() != null) {
+                    String moduleName = dependency.getGradleModuleVersion().get().getName();
+                    if (substitutionRules.get(moduleName) != null) {
+                        return false;
+                    }
+                }
+
                 // Eclipse only accepts archives as external dependencies (but not, for example, a DLL)
                 String name = dependency.getFile().getName();
                 return name.endsWith(".jar") || name.endsWith(".zip");
@@ -92,7 +110,19 @@ final class ClasspathContainerUpdater {
         }).toList();
 
         // return all dependencies as a joined list - The order of the dependencies is important see Bug 473348
-        return ImmutableList.<IClasspathEntry>builder().addAll(externalDependencies).addAll(projectDependencies).build();
+        return ImmutableList.<IClasspathEntry>builder().addAll(externalDependencies).addAll(projectDependencies.build()).build();
+    }
+
+    private Map<String, String> getSubstitutionRules() throws JavaModelException {
+        Optional<IClasspathEntry> gradleClasspathContainer = FluentIterable.from(Arrays.asList(eclipseProject.getRawClasspath())).firstMatch(new Predicate<IClasspathEntry>() {
+
+            @Override
+            public boolean apply(IClasspathEntry entry) {
+                return entry.getPath().toOSString().equals(GradleClasspathContainer.CONTAINER_ID);
+            }});
+        return gradleClasspathContainer.isPresent() ?
+                GradleClasspathContainer.collectSubstitutionRules(gradleClasspathContainer.get().getExtraAttributes()) :
+                Collections.<String, String>emptyMap();
     }
 
     private void setClasspathContainer(List<IClasspathEntry> classpathEntries, IProgressMonitor monitor) throws JavaModelException {
