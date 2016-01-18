@@ -11,6 +11,8 @@
 
 package org.eclipse.buildship.core.gradle;
 
+import java.io.File;
+
 import org.gradle.api.specs.Spec;
 
 import com.gradleware.tooling.toolingmodel.OmniEclipseProject;
@@ -32,12 +34,12 @@ public final class Specs {
      * @param projectPath the project path to match
      * @return the spec
      */
-    public static Spec<OmniEclipseProject> eclipseProjectMatchesProjectPath(final Path projectPath) {
+    public static Spec<OmniEclipseProject> eclipseProjectMatchesProjectPath(final File rootProjectDir, final Path projectPath) {
         return new Spec<OmniEclipseProject>() {
 
             @Override
             public boolean isSatisfiedBy(OmniEclipseProject candidate) {
-                return candidate.getPath().equals(projectPath);
+                return candidate.getRoot().getProjectDirectory().equals(rootProjectDir) && candidate.getPath().equals(projectPath);
             }
         };
     }

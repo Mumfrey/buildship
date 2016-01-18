@@ -13,6 +13,7 @@ package org.eclipse.buildship.core.workspace;
 
 import com.gradleware.tooling.toolingmodel.OmniEclipseGradleBuild;
 import com.gradleware.tooling.toolingmodel.OmniEclipseProject;
+import com.gradleware.tooling.toolingmodel.OmniEclipseWorkspace;
 import com.gradleware.tooling.toolingmodel.repository.FixedRequestAttributes;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -47,7 +48,7 @@ public interface WorkspaceGradleOperations {
      * @param existingDescriptorHandler whether to keep or delete existing .project files
      * @param monitor               the monitor to report the progress on
      */
-    void synchronizeGradleBuildWithWorkspace(OmniEclipseGradleBuild gradleBuild, FixedRequestAttributes rootRequestAttributes, List<String> workingSets, ExistingDescriptorHandler existingDescriptorHandler, IProgressMonitor monitor);
+    void synchronizeGradleBuildWithWorkspace(OmniEclipseGradleBuild gradleBuild, FixedRequestAttributes rootRequestAttributes, List<String> workingSets, ExistingDescriptorHandler existingDescriptorHandler, IProgressMonitor monitor, OmniEclipseWorkspace workspace);
 
     /**
      * Synchronizes the given Gradle project with its Eclipse workspace project counterpart. The algorithm is as follows:
@@ -118,7 +119,7 @@ public interface WorkspaceGradleOperations {
      * @param existingDescriptorHandler whether to delete or keep existing .project files
      * @param monitor               the monitor to report the progress on
      */
-    void synchronizeGradleProjectWithWorkspaceProject(OmniEclipseProject project, OmniEclipseGradleBuild gradleBuild, FixedRequestAttributes rootRequestAttributes, List<String> workingSets, ExistingDescriptorHandler existingDescriptorHandler, IProgressMonitor monitor);
+    void synchronizeGradleProjectWithWorkspaceProject(OmniEclipseProject project, OmniEclipseGradleBuild gradleBuild, FixedRequestAttributes rootRequestAttributes, List<String> workingSets, ExistingDescriptorHandler existingDescriptorHandler, IProgressMonitor monitor, OmniEclipseWorkspace workspace);
 
     /**
      * Synchronizes the given Eclipse workspace project with its Gradle counterpart, if that counterpart exists. The algorithm is as follows:
@@ -140,7 +141,7 @@ public interface WorkspaceGradleOperations {
      * @param rootRequestAttributes the preferences used to query the Gradle build, can be null
      * @param monitor               the monitor to report the progress on
      */
-    void synchronizeWorkspaceProject(IProject workspaceProject, OmniEclipseGradleBuild gradleBuild, FixedRequestAttributes rootRequestAttributes, IProgressMonitor monitor);
+    void synchronizeWorkspaceProject(IProject workspaceProject, OmniEclipseGradleBuild gradleBuild, FixedRequestAttributes rootRequestAttributes, IProgressMonitor monitor, OmniEclipseWorkspace workspace);
 
     /**
      * Uncouples the given Eclipse workspace project from Gradle. The algorithm is as follows:

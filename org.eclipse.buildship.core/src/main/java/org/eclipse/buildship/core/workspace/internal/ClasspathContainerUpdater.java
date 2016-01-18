@@ -17,8 +17,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+
+import com.gradleware.tooling.toolingmodel.OmniEclipseGradleBuild;
 import com.gradleware.tooling.toolingmodel.OmniEclipseProject;
 import com.gradleware.tooling.toolingmodel.OmniEclipseProjectDependency;
+import com.gradleware.tooling.toolingmodel.OmniEclipseWorkspace;
 import com.gradleware.tooling.toolingmodel.OmniExternalDependency;
 import org.eclipse.buildship.core.gradle.Specs;
 import org.eclipse.buildship.core.workspace.GradleClasspathContainer;
@@ -47,10 +50,12 @@ final class ClasspathContainerUpdater {
 
     private final IJavaProject eclipseProject;
     private final OmniEclipseProject gradleProject;
+    private OmniEclipseWorkspace workspace;
 
-    private ClasspathContainerUpdater(IJavaProject eclipseProject, OmniEclipseProject gradleProject) {
+    private ClasspathContainerUpdater(IJavaProject eclipseProject, OmniEclipseProject gradleProject, OmniEclipseWorkspace workspace) {
         this.eclipseProject = Preconditions.checkNotNull(eclipseProject);
         this.gradleProject = Preconditions.checkNotNull(gradleProject);
+        this.workspace = workspace;
     }
 
     private void updateClasspathContainer(IProgressMonitor monitor) throws JavaModelException {
@@ -65,8 +70,14 @@ final class ClasspathContainerUpdater {
 
                     @Override
                     public IClasspathEntry apply(OmniEclipseProjectDependency dependency) {
-                        OmniEclipseProject dependentProject = ClasspathContainerUpdater.this.gradleProject.getRoot()
-                                .tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetProjectPath())).get();
+                        OmniEclipseProject dependentProject = null;
+                        if (ClasspathContainerUpdater.this.workspace != null) {
+                            for (OmniEclipseGradleBuild build : ClasspathContainerUpdater.this.workspace.getGradleBuilds()) {
+                                dependentProject = build.getRootEclipseProject().tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetRootProjectDir(), dependency.getTargetProjectPath())).orNull();
+                            }
+                        } else {
+                            dependentProject = ClasspathContainerUpdater.this.gradleProject.getRoot().tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetRootProjectDir(), dependency.getTargetProjectPath())).get();
+                        }
                         IPath path = new Path("/" + dependentProject.getName());
                         return JavaCore.newProjectEntry(path, dependency.isExported());
                     }
@@ -108,8 +119,8 @@ final class ClasspathContainerUpdater {
      * @param monitor                the monitor to report progress on
      * @throws JavaModelException if the container assignment fails
      */
-    public static void update(IJavaProject eclipseProject, OmniEclipseProject gradleProject, IProgressMonitor monitor) throws JavaModelException {
-        ClasspathContainerUpdater updater = new ClasspathContainerUpdater(eclipseProject, gradleProject);
+    public static void update(IJavaProject eclipseProject, OmniEclipseProject gradleProject, IProgressMonitor monitor, OmniEclipseWorkspace workspace) throws JavaModelException {
+        ClasspathContainerUpdater updater = new ClasspathContainerUpdater(eclipseProject, gradleProject, workspace);
         updater.updateClasspathContainer(monitor);
     }
 

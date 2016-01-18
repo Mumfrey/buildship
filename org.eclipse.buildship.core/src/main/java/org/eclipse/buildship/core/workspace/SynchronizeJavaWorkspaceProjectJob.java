@@ -14,6 +14,7 @@ package org.eclipse.buildship.core.workspace;
 
 import com.google.common.collect.ImmutableList;
 import com.gradleware.tooling.toolingmodel.OmniEclipseGradleBuild;
+import com.gradleware.tooling.toolingmodel.OmniEclipseWorkspace;
 import com.gradleware.tooling.toolingmodel.repository.FetchStrategy;
 import com.gradleware.tooling.toolingmodel.repository.FixedRequestAttributes;
 import com.gradleware.tooling.toolingmodel.repository.ModelRepository;
@@ -71,6 +72,7 @@ public final class SynchronizeJavaWorkspaceProjectJob extends ToolingApiWorkspac
 
     private void synchronizeWorkspaceProject(IJavaProject javaProject, IProgressMonitor monitor, CancellationToken token) throws CoreException {
         FixedRequestAttributes rootRequestAttributes = null;
+        OmniEclipseWorkspace workspace = null;
         OmniEclipseGradleBuild gradleBuild = null;
 
         IProject project = javaProject.getProject();
@@ -78,19 +80,24 @@ public final class SynchronizeJavaWorkspaceProjectJob extends ToolingApiWorkspac
             // find the Gradle project corresponding to the workspace project and update it accordingly
             ProjectConfiguration configuration = CorePlugin.projectConfigurationManager().readProjectConfiguration(project);
             rootRequestAttributes = configuration.getRequestAttributes();
-            gradleBuild = fetchEclipseGradleBuild(rootRequestAttributes, monitor, token);
+            workspace = fetchEclipseGradleBuild(rootRequestAttributes, monitor, token);
+            for (OmniEclipseGradleBuild build : workspace.getGradleBuilds()) {
+                if (build.getRootEclipseProject().getProjectDirectory().equals(rootRequestAttributes.getProjectDir())) {
+                    gradleBuild = build;
+                }
+            }
         }
 
-        CorePlugin.workspaceGradleOperations().synchronizeWorkspaceProject(project, gradleBuild, rootRequestAttributes, monitor);
+        CorePlugin.workspaceGradleOperations().synchronizeWorkspaceProject(project, gradleBuild, rootRequestAttributes, monitor, workspace);
     }
 
-    private OmniEclipseGradleBuild fetchEclipseGradleBuild(FixedRequestAttributes fixedRequestAttributes, IProgressMonitor monitor, CancellationToken token) {
+    private OmniEclipseWorkspace fetchEclipseGradleBuild(FixedRequestAttributes fixedRequestAttributes, IProgressMonitor monitor, CancellationToken token) {
         ProcessStreams streams = CorePlugin.processStreamsProvider().getBackgroundJobProcessStreams();
         List<ProgressListener> progressListeners = ImmutableList.<ProgressListener>of(new DelegatingProgressListener(monitor));
         TransientRequestAttributes transientAttributes = new TransientRequestAttributes(false, streams.getOutput(), streams.getError(), null, progressListeners,
                 ImmutableList.<org.gradle.tooling.events.ProgressListener>of(), token);
         ModelRepository repository = CorePlugin.modelRepositoryProvider().getModelRepository(fixedRequestAttributes);
-        return repository.fetchEclipseGradleBuild(transientAttributes, FetchStrategy.LOAD_IF_NOT_CACHED);
+        return repository.fetchEclipseWorkspace(transientAttributes, FetchStrategy.LOAD_IF_NOT_CACHED);
     }
 
 }
