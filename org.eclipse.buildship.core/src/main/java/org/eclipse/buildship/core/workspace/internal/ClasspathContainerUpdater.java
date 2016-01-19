@@ -73,7 +73,10 @@ final class ClasspathContainerUpdater {
                         OmniEclipseProject dependentProject = null;
                         if (ClasspathContainerUpdater.this.workspace != null) {
                             for (OmniEclipseGradleBuild build : ClasspathContainerUpdater.this.workspace.getGradleBuilds()) {
-                                dependentProject = build.getRootEclipseProject().tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetRootProjectDir(), dependency.getTargetProjectPath())).orNull();
+                                OmniEclipseProject matchedProject = build.getRootEclipseProject().tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetRootProjectDir(), dependency.getTargetProjectPath())).orNull();
+                                if (matchedProject != null) {
+                                    dependentProject = matchedProject;
+                                }
                             }
                         } else {
                             dependentProject = ClasspathContainerUpdater.this.gradleProject.getRoot().tryFind(Specs.eclipseProjectMatchesProjectPath(dependency.getTargetRootProjectDir(), dependency.getTargetProjectPath())).get();
